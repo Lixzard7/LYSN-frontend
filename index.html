@@ -359,9 +359,7 @@
         function initWebSocket() {
             // For development, use a local WebSocket server
             // In production, replace with your actual WebSocket server URL
-            const wsUrl = window.location.protocol === 'https:' 
-                ? `wss://${window.location.host}/ws` 
-                : `ws://${window.location.host}`;
+            const wsUrl = "https://lysn-backend.onrender.com";
             
             try {
                 socket = new WebSocket(wsUrl);
@@ -932,4 +930,5 @@
         });
     </script>
 </body>
+
 </html>
