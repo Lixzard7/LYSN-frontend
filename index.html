@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LYSN- Listen Together</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 16px;
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(45deg, #74b9ff, #0984e3);
+        }
+
+        .btn-success {
+            background: linear-gradient(45deg, #00b894, #00a085);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #e17055, #d63031);
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status.connected {
+            background: rgba(0, 184, 148, 0.2);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+        }
+
+        .status.disconnected {
+            background: rgba(214, 48, 49, 0.2);
+            border: 1px solid rgba(214, 48, 49, 0.3);
+        }
+
+        .status.hosting {
+            background: rgba(253, 203, 110, 0.2);
+            border: 1px solid rgba(253, 203, 110, 0.3);
+        }
+
+        .room-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .users-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .user-item {
+            padding: 5px 10px;
+            margin: 2px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .user-item.host {
+            background: rgba(253, 203, 110, 0.2);
+        }
+
+        .audio-controls {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .volume-control {
+            margin: 15px 0;
+        }
+
+        .volume-control input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .instructions {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #fdcb6e;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #audioVisualizer {
+            width: 100%;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .latency-info {
+            font-size: 0.9em;
+            text-align: center;
+            opacity: 0.8;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .main-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>LYSN</h1>
+            <p>Hear Music Together,Anywhere</p>
+        </div>
+
+        <div class="main-card">
+            <!-- Connection Status -->
+            <div id="status" class="status disconnected">
+                Disconnected
+            </div>
+
+            <!-- Instructions -->
+            <div class="instructions">
+                <h3>How to use:</h3>
+                <p><strong>To host:</strong> Create a room, start sharing audio, then play music from Spotify, YouTube, or any app on your device.</p>
+                <p><strong>To join:</strong> Enter the room code and connect. You'll hear everything the host is playing in real-time!</p>
+            </div>
+
+            <!-- Create/Join Room Section -->
+            <div id="roomSection" class="section">
+                <h2>Create or Join Room</h2>
+                
+                <div class="input-group">
+                    <label for="username">Your Name</label>
+                    <input type="text" id="username" placeholder="Enter your name" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="roomCode">Room Code (leave empty to create new room)</label>
+                    <input type="text" id="roomCode" placeholder="Enter room code to join">
+                </div>
+
+                <button class="btn btn-secondary" onclick="createRoom()">Create New Room</button>
+                <button class="btn btn-success" onclick="joinRoom()">Join Room</button>
+            </div>
+
+            <!-- Room Info (Hidden initially) -->
+            <div id="roomInfo" class="section hidden">
+                <h2>Room Information</h2>
+                <div class="room-info">
+                    <div><strong>Room Code:</strong> <span id="currentRoomCode">-</span></div>
+                    <div><strong>Your Role:</strong> <span id="userRole">-</span></div>
+                    <div><strong>Connected Users:</strong> <span id="userCount">0</span></div>
+                </div>
+                
+                <div class="users-list" id="usersList">
+                    <!-- Users will be populated here -->
+                </div>
+
+                <button class="btn btn-danger" onclick="leaveRoom()">Leave Room</button>
+            </div>
+
+            <!-- Audio Controls for Host -->
+            <div id="hostControls" class="section hidden">
+                <h2>Host Controls</h2>
+                <div class="audio-controls">
+                    <button id="shareAudioBtn" class="btn btn-success" onclick="startAudioShare()">
+                        🎤 Start Audio Share
+                    </button>
+                    <button id="stopShareBtn" class="btn btn-danger hidden" onclick="stopAudioShare()">
+                        ⏹️ Stop Sharing
+                    </button>
+                    
+                    <div class="instructions">
+                        <p><strong>High-Quality Audio Streaming:</strong><br>
+                        Click "Start Audio Share" then select "Share system audio" for original quality.<br>
+                        Configured for 48kHz/16-bit stereo at 320kbps - perfect for music streaming!</p>
+                        <p><strong>Tips for best quality:</strong><br>
+                        • Use Chrome or Edge browser<br>
+                        • Ensure stable internet connection<br>
+                        • Close unnecessary apps to reduce CPU load<br>
+                        • Use wired internet when possible</p>
+                    </div>
+
+                    <canvas id="audioVisualizer"></canvas>
+                    
+                    <div class="volume-control">
+                        <label>Output Volume</label>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="50" onchange="updateVolume()">
+                        <span id="volumeValue">50%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Audio Controls for Listeners -->
+            <div id="listenerControls" class="section hidden">
+                <h2>Listening</h2>
+                <div class="audio-controls">
+                    <div id="audioStatus">Waiting for host to start sharing audio...</div>
+                    <audio id="remoteAudio" autoplay controls style="width: 100%; margin: 15px 0;"></audio>
+                    
+                    <div class="volume-control">
+                        <label>Volume</label>
+                        <input type="range" id="listenerVolumeSlider" min="0" max="100" value="50" onchange="updateListenerVolume()">
+                        <span id="listenerVolumeValue">50%</span>
+                    </div>
+                    
+                    <div class="latency-info">
+                        <div>Latency: <span id="latencyDisplay">-- ms</span></div>
+                        <div>Buffer Health: <span id="bufferHealth">Good</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let socket = null;
+        let isHost = false;
+        let currentRoom = null;
+        let localStream = null;
+        let peerConnections = {};
+        let audioContext = null;
+        let analyser = null;
+        let dataArray = null;
+        let animationId = null;
+        let startTime = null;
+        let users = {};
+
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            // For development, use a local WebSocket server
+            // In production, replace with your actual WebSocket server URL
+            const wsUrl = window.location.protocol === 'https:' 
+                ? `wss://${window.location.host}/ws` 
+                : `ws://${window.location.host}`;
+            
+            try {
+                socket = new WebSocket(wsUrl);
+                
+                socket.onopen = function() {
+                    updateStatus('Connected to server', 'connected');
+                };
+                
+                socket.onmessage = function(event) {
+                    handleWebSocketMessage(JSON.parse(event.data));
+                };
+                
+                socket.onclose = function() {
+                    updateStatus('Disconnected from server', 'disconnected');
+                    setTimeout(initWebSocket, 3000); // Reconnect after 3 seconds
+                };
+                
+                socket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateStatus('Connection error', 'disconnected');
+                };
+            } catch (error) {
+                console.error('Failed to connect to WebSocket server:', error);
+                updateStatus('Unable to connect to server. Please ensure the server is running.', 'disconnected');
+            }
+        }
+
+        // Handle WebSocket messages
+        function handleWebSocketMessage(message) {
+            switch (message.type) {
+                case 'room-created':
+                    handleRoomCreated(message.data);
+                    break;
+                case 'room-joined':
+                    handleRoomJoined(message.data);
+                    break;
+                case 'user-joined':
+                    handleUserJoined(message.data);
+                    break;
+                case 'user-left':
+                    handleUserLeft(message.data);
+                    break;
+                case 'webrtc-offer':
+                    handleWebRTCOffer(message.data);
+                    break;
+                case 'webrtc-answer':
+                    handleWebRTCAnswer(message.data);
+                    break;
+                case 'webrtc-ice-candidate':
+                    handleICECandidate(message.data);
+                    break;
+                case 'audio-started':
+                    handleAudioStarted(message.data);
+                    break;
+                case 'audio-stopped':
+                    handleAudioStopped(message.data);
+                    break;
+                case 'sync-timestamp':
+                    handleSyncTimestamp(message.data);
+                    break;
+                case 'error':
+                    alert('Error: ' + message.message);
+                    break;
+            }
+        }
+
+        // Send message through WebSocket
+        function sendMessage(message) {
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(message));
+            }
+        }
+
+        // Update connection status
+        function updateStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Create room
+        function createRoom() {
+            const username = document.getElementById('username').value.trim();
+            if (!username) {
+                alert('Please enter your name');
+                return;
+            }
+
+            sendMessage({
+                type: 'create-room',
+                data: { username }
+            });
+        }
+
+        // Join room
+        function joinRoom() {
+            const username = document.getElementById('username').value.trim();
+            const roomCode = document.getElementById('roomCode').value.trim();
+            
+            if (!username) {
+                alert('Please enter your name');
+                return;
+            }
+            
+            if (!roomCode) {
+                alert('Please enter room code');
+                return;
+            }
+
+            sendMessage({
+                type: 'join-room',
+                data: { username, roomCode }
+            });
+        }
+
+        // Handle room created
+        function handleRoomCreated(data) {
+            isHost = true;
+            currentRoom = data.roomCode;
+            users = data.users;
+            
+            document.getElementById('currentRoomCode').textContent = data.roomCode;
+            document.getElementById('userRole').textContent = 'Host';
+            
+            showRoomInterface();
+            updateUsersList();
+            updateStatus(`Hosting room ${data.roomCode}`, 'hosting');
+        }
+
+        // Handle room joined
+        function handleRoomJoined(data) {
+            isHost = false;
+            currentRoom = data.roomCode;
+            users = data.users;
+            
+            document.getElementById('currentRoomCode').textContent = data.roomCode;
+            document.getElementById('userRole').textContent = 'Listener';
+            
+            showRoomInterface();
+            updateUsersList();
+            updateStatus(`Joined room ${data.roomCode}`, 'connected');
+        }
+
+        // Handle user joined
+        function handleUserJoined(data) {
+            users = data.users;
+            updateUsersList();
+            
+            // If we're the host, initiate WebRTC connection
+            if (isHost && localStream) {
+                initiateWebRTCConnection(data.user.id);
+            }
+        }
+
+        // Handle user left
+        function handleUserLeft(data) {
+            users = data.users;
+            updateUsersList();
+            
+            // Clean up WebRTC connection
+            if (peerConnections[data.userId]) {
+                peerConnections[data.userId].close();
+                delete peerConnections[data.userId];
+            }
+        }
+
+        // Show room interface
+        function showRoomInterface() {
+            document.getElementById('roomSection').classList.add('hidden');
+            document.getElementById('roomInfo').classList.remove('hidden');
+            
+            if (isHost) {
+                document.getElementById('hostControls').classList.remove('hidden');
+                document.getElementById('listenerControls').classList.add('hidden');
+            } else {
+                document.getElementById('hostControls').classList.add('hidden');
+                document.getElementById('listenerControls').classList.remove('hidden');
+            }
+        }
+
+        // Update users list
+        function updateUsersList() {
+            const usersList = document.getElementById('usersList');
+            const userCount = document.getElementById('userCount');
+            
+            usersList.innerHTML = '';
+            userCount.textContent = Object.keys(users).length;
+            
+            Object.values(users).forEach(user => {
+                const userItem = document.createElement('div');
+                userItem.className = `user-item ${user.isHost ? 'host' : ''}`;
+                userItem.innerHTML = `
+                    <span>${user.username}</span>
+                    <span>${user.isHost ? '👑 Host' : '👤 Listener'}</span>
+                `;
+                usersList.appendChild(userItem);
+            });
+        }
+
+        // Start audio sharing (host only)
+        async function startAudioShare() {
+            try {
+                // Chrome requires video:true for system audio to show up
+                localStream = await navigator.mediaDevices.getDisplayMedia({
+                  video: true,   // required (dummy video feed, you can ignore it later)
+                 audio:{
+                     channelCount: 2,       // stereo
+                     sampleRate: 48000,     // studio quality
+                     sampleSize: 16,
+                     echoCancellation: false,
+                     noiseSuppression: false,
+                     autoGainControl: false
+                  }
+
+                });
+
+                 // OPTIONAL: immediately stop sending the video track
+                // so only audio gets streamed
+                 const videoTrack = localStream.getVideoTracks()[0];
+                 if (videoTrack) {
+                     videoTrack.stop();  // disables screen video, keeps only audio
+                }
+
+                 // Setup audio visualization
+                setupAudioVisualization();
+        
+                 // Notify server
+                sendMessage({
+                     type: 'audio-started',
+                     data: { roomCode: currentRoom }
+                });
+
+                 document.getElementById('shareAudioBtn').classList.add('hidden');
+                 document.getElementById('stopShareBtn').classList.remove('hidden');
+
+                 updateStatus('Sharing system audio - play music in any app!', 'hosting');
+
+                 // Send audio to all connected users
+                 Object.keys(peerConnections).forEach(userId => {
+                     const audioTrack = localStream.getAudioTracks()[0];
+                     const sender = peerConnections[userId].getSenders().find(s =>
+                         s.track && s.track.kind === 'audio'
+                 );
+
+                 if (sender) {
+                     sender.replaceTrack(audioTrack);
+                 } else {
+                     peerConnections[userId].addTrack(audioTrack, localStream);
+                 }
+             });
+
+         } catch (error) {
+             console.error('Error starting audio share:', error);
+             alert('Failed to start audio sharing. Make sure to select "Share system audio" when prompted.');
+         }
+    }
+           
+
+        // Stop audio sharing
+        function stopAudioShare() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            sendMessage({
+                type: 'audio-stopped',
+                data: { roomCode: currentRoom }
+            });
+            
+            document.getElementById('shareAudioBtn').classList.remove('hidden');
+            document.getElementById('stopShareBtn').classList.add('hidden');
+            
+            updateStatus(`Hosting room ${currentRoom}`, 'hosting');
+        }
+
+        // Setup audio visualization
+        function setupAudioVisualization() {
+            if (!localStream) return;
+            
+            audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(localStream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            
+            source.connect(analyser);
+            
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            const canvas = document.getElementById('audioVisualizer');
+            const ctx = canvas.getContext('2d');
+            canvas.width = canvas.offsetWidth;
+            canvas.height = 60;
+            
+            function animate() {
+                animationId = requestAnimationFrame(animate);
+                
+                analyser.getByteFrequencyData(dataArray);
+                
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                const barWidth = canvas.width / dataArray.length;
+                let x = 0;
+                
+                for (let i = 0; i < dataArray.length; i++) {
+                    const barHeight = (dataArray[i] / 255) * canvas.height;
+                    
+                    const r = Math.floor(barHeight * 2);
+                    const g = Math.floor(255 - barHeight * 2);
+                    const b = 100;
+                    
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    
+                    x += barWidth;
+                }
+            }
+            
+            animate();
+        }
+
+        // WebRTC functions
+        function initiateWebRTCConnection(userId) {
+            const peerConnection = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            });
+            
+            peerConnections[userId] = peerConnection;
+            
+            // Add local stream if available
+            if (localStream) {
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+            
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendMessage({
+                        type: 'webrtc-ice-candidate',
+                        data: {
+                            roomCode: currentRoom,
+                            targetUserId: userId,
+                            candidate: event.candidate
+                        }
+                    });
+                }
+            };
+            
+            // Create and send offer
+            peerConnection.createOffer().then(offer => {
+                // Force Opus stereo @ 320kbps
+                 offer.sdp = offer.sdp.replace(
+                     /a=fmtp:111 .*/g,
+                     "a=fmtp:111 minptime=10;useinbandfec=1;stereo=1;maxaveragebitrate=320000"
+                );
+                peerConnection.setLocalDescription(offer);
+                sendMessage({
+                    type: 'webrtc-offer',
+                    data: {
+                        roomCode: currentRoom,
+                        targetUserId: userId,
+                        offer: offer
+                    }
+                });
+            });
+        }
+
+        // Handle WebRTC offer
+        function handleWebRTCOffer(data) {
+            const peerConnection = new RTCPeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            });
+            
+            peerConnections[data.fromUserId] = peerConnection;
+            
+            // Handle incoming stream
+            peerConnection.ontrack = (event) => {
+                const remoteAudio = document.getElementById('remoteAudio');
+                remoteAudio.srcObject = event.streams[0];
+                 // Try to reduce buffering to ~20ms
+                 const receiver = peerConnection.getReceivers().find(r => r.track.kind === 'audio');
+                if (receiver && receiver.playoutDelayHint !== undefined) {
+                     receiver.playoutDelayHint = 0.02; // 20 ms
+            }   
+
+                document.getElementById('audioStatus').textContent = 'Receiving audio from host...';
+            };
+            
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendMessage({
+                        type: 'webrtc-ice-candidate',
+                        data: {
+                            roomCode: currentRoom,
+                            targetUserId: data.fromUserId,
+                            candidate: event.candidate
+                        }
+                    });
+                }
+            };
+            
+            // Set remote description and create answer
+            peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer)).then(() => {
+                return peerConnection.createAnswer();
+            }).then(answer => {
+                peerConnection.setLocalDescription(answer);
+                sendMessage({
+                    type: 'webrtc-answer',
+                    data: {
+                        roomCode: currentRoom,
+                        targetUserId: data.fromUserId,
+                        answer: answer
+                    }
+                });
+            });
+        }
+
+        // Handle WebRTC answer
+        function handleWebRTCAnswer(data) {
+            if (peerConnections[data.fromUserId]) {
+                peerConnections[data.fromUserId].setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+        }
+
+        // Handle ICE candidate
+        function handleICECandidate(data) {
+            if (peerConnections[data.fromUserId]) {
+                peerConnections[data.fromUserId].addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+
+        // Handle audio started notification
+        function handleAudioStarted(data) {
+            if (!isHost) {
+                document.getElementById('audioStatus').textContent = 'Host started sharing audio...';
+            }
+        }
+
+        // Handle audio stopped notification
+        function handleAudioStopped(data) {
+            if (!isHost) {
+                document.getElementById('audioStatus').textContent = 'Host stopped sharing audio';
+                const remoteAudio = document.getElementById('remoteAudio');
+                remoteAudio.srcObject = null;
+            }
+        }
+
+        // Handle sync timestamp
+        function handleSyncTimestamp(data) {
+            // Calculate latency (basic implementation)
+            if (startTime) {
+                const latency = Date.now() - startTime;
+                document.getElementById('latencyDisplay').textContent = latency + ' ms';
+            }
+            startTime = Date.now();
+        }
+
+        // Volume control
+        function updateVolume() {
+            const volume = document.getElementById('volumeSlider').value;
+            document.getElementById('volumeValue').textContent = volume + '%';
+            
+            if (localStream) {
+                const audioTrack = localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    // Note: Direct volume control on MediaStreamTrack is limited
+                    // In a production app, you'd use Web Audio API for proper volume control
+                }
+            }
+        }
+
+        function updateListenerVolume() {
+            const volume = document.getElementById('listenerVolumeSlider').value;
+            document.getElementById('listenerVolumeValue').textContent = volume + '%';
+            
+            const remoteAudio = document.getElementById('remoteAudio');
+            remoteAudio.volume = volume / 100;
+        }
+
+        // Leave room
+        function leaveRoom() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+            }
+            
+            Object.values(peerConnections).forEach(pc => pc.close());
+            peerConnections = {};
+            
+            sendMessage({
+                type: 'leave-room',
+                data: { roomCode: currentRoom }
+            });
+            
+            // Reset UI
+            document.getElementById('roomSection').classList.remove('hidden');
+            document.getElementById('roomInfo').classList.add('hidden');
+            document.getElementById('hostControls').classList.add('hidden');
+            document.getElementById('listenerControls').classList.add('hidden');
+            
+            currentRoom = null;
+            isHost = false;
+            users = {};
+            
+            updateStatus('Left room', 'disconnected');
+        }
+
+        // Demo mode for testing UI without server
+        function enableDemoMode() {
+            console.log('Enabling demo mode...');
+            
+            // Create demo room after 2 seconds
+            setTimeout(() => {
+                // Simulate room creation
+                isHost = true;
+                currentRoom = 'DEMO123';
+                users = {
+                    'demo1': { id: 'demo1', username: 'You (Demo)', isHost: true }
+                };
+                
+                document.getElementById('currentRoomCode').textContent = 'DEMO123';
+                document.getElementById('userRole').textContent = 'Host (Demo Mode)';
+                
+                showRoomInterface();
+                updateUsersList();
+                updateStatus('Demo Mode - UI Preview Only', 'hosting');
+                
+                // Show demo instructions
+                alert('Demo Mode Active!\n\nThis is a UI preview. To use the full app:\n1. Install Node.js\n2. Save server.js and package.json\n3. Run: npm install && npm start\n4. Open http://localhost:3000');
+            }, 2000);
+        }
+
+        // Initialize app
+        function init() {
+            // Try to connect to WebSocket server
+            initWebSocket();
+            
+            // Set up periodic sync for latency measurement
+            setInterval(() => {
+                if (currentRoom && socket && socket.readyState === WebSocket.OPEN) {
+                    sendMessage({
+                        type: 'sync-request',
+                        data: { roomCode: currentRoom, timestamp: Date.now() }
+                    });
+                }
+            }, 5000);
+        }
+
+        // Start the app when page loads
+        window.addEventListener('load', init);
+        
+        // Clean up when page unloads
+        window.addEventListener('beforeunload', () => {
+            if (currentRoom) {
+                leaveRoom();
+            }
+        });
+    </script>
+</body>
+</html>
