@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>LYSN- Listen Together</title>
     <style>
         * {
@@ -297,13 +297,17 @@
                     <button id="stopShareBtn" class="btn btn-danger hidden" onclick="stopAudioShare()">
                         ⏹️ Stop Sharing
                     </button>
+                    <!-- Noise suppression toggle -->
+                    <button id="noiseToggleBtn" class="btn" style="background:linear-gradient(45deg,#6c5ce7,#00b894); color:white;" onclick="toggleNoiseSuppression()">
+                        🔊 Noise Suppression: OFF
+                    </button>
                     
                     <div class="instructions">
                         <p><strong>High-Quality Audio Streaming:</strong><br>
-                        Click "Start Audio Share" then select "Share system audio" for original quality.<br>
-                        Configured for 48kHz/16-bit stereo at 320kbps - perfect for music streaming!</p>
+                        Click "Start Audio Share" then select "Share system audio" for original quality on desktop.<br>
+                        Configured for 48kHz/16-bit stereo where available - optimized for music streaming.</p>
                         <p><strong>Tips for best quality:</strong><br>
-                        • Use Chrome or Edge browser<br>
+                        • Use Chrome or Edge browser (desktop for system audio)<br>
                         • Ensure stable internet connection<br>
                         • Close unnecessary apps to reduce CPU load<br>
                         • Use wired internet when possible</p>
@@ -324,7 +328,7 @@
                 <h2>Listening</h2>
                 <div class="audio-controls">
                     <div id="audioStatus">Waiting for host to start sharing audio...</div>
-                    <audio id="remoteAudio" autoplay controls style="width: 100%; margin: 15px 0;"></audio>
+                    <audio id="remoteAudio" autoplay playsinline controls preload="auto" style="width: 100%; margin: 15px 0;"></audio>
                     
                     <div class="volume-control">
                         <label>Volume</label>
@@ -354,12 +358,62 @@
         let animationId = null;
         let startTime = null;
         let users = {};
+        let noiseSuppressionEnabled = false; // toggle for mobile mic capture
+
+        // ----------------- HELPERS -----------------
+        // Apply Opus settings: stereo, low ptime, and target bitrate
+        function applyOpusSettings(sdp, maxBitrate = 256000) {
+            const lines = sdp.split('\r\n');
+            let opusPayload = null;
+            for (let i = 0; i < lines.length; i++) {
+                const m = lines[i].match(/^a=rtpmap:(\d+)\s+opus\/48000/i);
+                if (m) { opusPayload = m[1]; break; }
+            }
+            if (!opusPayload) return sdp;
+
+            const fmtpRegex = new RegExp('^a=fmtp:' + opusPayload + ' (.*)$');
+            let found = false;
+            for (let i = 0; i < lines.length; i++) {
+                if (fmtpRegex.test(lines[i])) {
+                    lines[i] = lines[i].replace(fmtpRegex,
+                        `a=fmtp:${opusPayload} $1;stereo=1;ptime=10;minptime=10;maxaveragebitrate=${maxBitrate}`);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].startsWith('a=rtpmap:' + opusPayload + ' ')) {
+                        lines.splice(i+1, 0,
+                            `a=fmtp:${opusPayload} stereo=1;ptime=10;minptime=10;maxaveragebitrate=${maxBitrate}`);
+                        break;
+                    }
+                }
+            }
+            return lines.join('\r\n');
+        }
+
+        // Try to set sender bitrate (best-effort)
+        async function setSenderBitrate(peerConnection, kind = 'audio', bitrate = 256000) {
+            try {
+                const senders = peerConnection.getSenders();
+                for (const sender of senders) {
+                    if (sender.track && sender.track.kind === kind) {
+                        const params = sender.getParameters();
+                        if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+                        params.encodings.forEach(e => { e.maxBitrate = bitrate; });
+                        await sender.setParameters(params);
+                    }
+                }
+            } catch (e) {
+                console.warn("setSenderBitrate failed (browser may not support):", e);
+            }
+        }
 
         // Initialize WebSocket connection
         function initWebSocket() {
-            // For development, use a local WebSocket server
-            // In production, replace with your actual WebSocket server URL
-            const wsUrl = "https://lysn-backend.onrender.com";
+            // Use secure websocket URL to your backend (replace with your real domain if different)
+            const wsUrl = "wss://lysn-backend.onrender.com";
             
             try {
                 socket = new WebSocket(wsUrl);
@@ -559,64 +613,90 @@
             });
         }
 
-        // Start audio sharing (host only)
+        // Toggle noise suppression (for mobile mic mode)
+        function toggleNoiseSuppression() {
+            noiseSuppressionEnabled = !noiseSuppressionEnabled;
+            const btn = document.getElementById('noiseToggleBtn');
+            btn.textContent = `🔊 Noise Suppression: ${noiseSuppressionEnabled ? 'ON' : 'OFF'}`;
+            btn.style.opacity = noiseSuppressionEnabled ? '0.9' : '1';
+            alert(`Noise suppression is now ${noiseSuppressionEnabled ? 'ENABLED (better for voice)' : 'DISABLED (better for music)'}. If you are already sharing, stop and start sharing to apply the change.`);
+        }
+
+        // Start audio sharing (host only) - mobile fallback + quality constraints
         async function startAudioShare() {
             try {
-                // Chrome requires video:true for system audio to show up
-                localStream = await navigator.mediaDevices.getDisplayMedia({
-                  video: true,   // required (dummy video feed, you can ignore it later)
-                 audio:{
-                     channelCount: 2,       // stereo
-                     sampleRate: 48000,     // studio quality
-                     sampleSize: 16,
-                     echoCancellation: false,
-                     noiseSuppression: false,
-                     autoGainControl: false
-                  }
+                const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
 
-                });
+                if (isMobile) {
+                    // Mobile: use mic fallback with best constraints available
+                    localStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            channelCount: 2,
+                            sampleRate: 48000,
+                            sampleSize: 16,
+                            echoCancellation: false,
+                            noiseSuppression: noiseSuppressionEnabled,
+                            autoGainControl: false
+                        }
+                    });
+                    alert("Mobile host: using microphone capture. Background noise and voices will be captured.");
+                } else {
+                    // Desktop: use display capture with system audio (video:true required for system audio picker)
+                    localStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: true,
+                        audio: {
+                            channelCount: 2,
+                            sampleRate: 48000,
+                            sampleSize: 16,
+                            echoCancellation: false,
+                            noiseSuppression: false,
+                            autoGainControl: false
+                        }
+                    });
 
-                 // OPTIONAL: immediately stop sending the video track
-                // so only audio gets streamed
-                 const videoTrack = localStream.getVideoTracks()[0];
-                 if (videoTrack) {
-                     videoTrack.stop();  // disables screen video, keeps only audio
+                    // Stop video immediately (we only want audio)
+                    const videoTrack = localStream.getVideoTracks()[0];
+                    if (videoTrack) videoTrack.stop();
                 }
 
-                 // Setup audio visualization
+                // Setup audio visualization
                 setupAudioVisualization();
-        
-                 // Notify server
+
+                // Notify server that audio sharing started
                 sendMessage({
-                     type: 'audio-started',
-                     data: { roomCode: currentRoom }
+                    type: 'audio-started',
+                    data: { roomCode: currentRoom }
                 });
 
-                 document.getElementById('shareAudioBtn').classList.add('hidden');
-                 document.getElementById('stopShareBtn').classList.remove('hidden');
+                document.getElementById('shareAudioBtn').classList.add('hidden');
+                document.getElementById('stopShareBtn').classList.remove('hidden');
 
-                 updateStatus('Sharing system audio - play music in any app!', 'hosting');
+                updateStatus('Sharing audio - play music in any app!', 'hosting');
 
-                 // Send audio to all connected users
-                 Object.keys(peerConnections).forEach(userId => {
-                     const audioTrack = localStream.getAudioTracks()[0];
-                     const sender = peerConnections[userId].getSenders().find(s =>
-                         s.track && s.track.kind === 'audio'
-                 );
+                // Send audio to all connected users (replace track or add)
+                Object.keys(peerConnections).forEach(async userId => {
+                    const pc = peerConnections[userId];
+                    if (!pc) return;
+                    const audioTrack = localStream.getAudioTracks()[0];
+                    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
 
-                 if (sender) {
-                     sender.replaceTrack(audioTrack);
-                 } else {
-                     peerConnections[userId].addTrack(audioTrack, localStream);
-                 }
-             });
+                    try {
+                        if (sender) {
+                            await sender.replaceTrack(audioTrack);
+                        } else {
+                            pc.addTrack(audioTrack, localStream);
+                        }
+                        await setSenderBitrate(pc, 'audio', 256000);
+                    } catch (e) {
+                        console.warn('Error adding/replacing track for user', userId, e);
+                    }
+                });
 
-         } catch (error) {
-             console.error('Error starting audio share:', error);
-             alert('Failed to start audio sharing. Make sure to select "Share system audio" when prompted.');
-         }
-    }
-           
+            } catch (error) {
+                console.error('Error starting audio share:', error);
+                alert('Failed to start audio sharing. On desktop: make sure to select "Share system audio". On mobile: microphone capture may be limited by browser.');
+            }
+        }
 
         // Stop audio sharing
         function stopAudioShare() {
@@ -644,46 +724,50 @@
         function setupAudioVisualization() {
             if (!localStream) return;
             
-            audioContext = new AudioContext();
-            const source = audioContext.createMediaStreamSource(localStream);
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            
-            source.connect(analyser);
-            
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
-            const canvas = document.getElementById('audioVisualizer');
-            const ctx = canvas.getContext('2d');
-            canvas.width = canvas.offsetWidth;
-            canvas.height = 60;
-            
-            function animate() {
-                animationId = requestAnimationFrame(animate);
+            try {
+                audioContext = new AudioContext();
+                const source = audioContext.createMediaStreamSource(localStream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
                 
-                analyser.getByteFrequencyData(dataArray);
+                source.connect(analyser);
                 
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
                 
-                const barWidth = canvas.width / dataArray.length;
-                let x = 0;
+                const canvas = document.getElementById('audioVisualizer');
+                const ctx = canvas.getContext('2d');
+                canvas.width = canvas.offsetWidth;
+                canvas.height = 60;
                 
-                for (let i = 0; i < dataArray.length; i++) {
-                    const barHeight = (dataArray[i] / 255) * canvas.height;
+                function animate() {
+                    animationId = requestAnimationFrame(animate);
                     
-                    const r = Math.floor(barHeight * 2);
-                    const g = Math.floor(255 - barHeight * 2);
-                    const b = 100;
+                    analyser.getByteFrequencyData(dataArray);
                     
-                    ctx.fillStyle = `rgb(${r},${g},${b})`;
-                    ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
-                    x += barWidth;
+                    const barWidth = canvas.width / dataArray.length;
+                    let x = 0;
+                    
+                    for (let i = 0; i < dataArray.length; i++) {
+                        const barHeight = (dataArray[i] / 255) * canvas.height;
+                        
+                        const r = Math.floor(barHeight * 2);
+                        const g = Math.floor(255 - barHeight * 2);
+                        const b = 100;
+                        
+                        ctx.fillStyle = `rgb(${r},${g},${b})`;
+                        ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                        
+                        x += barWidth;
+                    }
                 }
+                
+                animate();
+            } catch (e) {
+                console.warn('Audio visualization setup failed:', e);
             }
-            
-            animate();
         }
 
         // WebRTC functions
@@ -691,7 +775,9 @@
             const peerConnection = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' }
-                ]
+                ],
+                bundlePolicy: 'max-bundle',
+                rtcpMuxPolicy: 'require'
             });
             
             peerConnections[userId] = peerConnection;
@@ -716,15 +802,22 @@
                     });
                 }
             };
+
+            // Optional: handle connection state changes for debugging
+            peerConnection.onconnectionstatechange = () => {
+                // console.log('PC state for', userId, peerConnection.connectionState);
+            };
             
             // Create and send offer
-            peerConnection.createOffer().then(offer => {
-                // Force Opus stereo @ 320kbps
-                 offer.sdp = offer.sdp.replace(
-                     /a=fmtp:111 .*/g,
-                     "a=fmtp:111 minptime=10;useinbandfec=1;stereo=1;maxaveragebitrate=320000"
-                );
-                peerConnection.setLocalDescription(offer);
+            peerConnection.createOffer().then(async offer => {
+                // Apply Opus settings (stereo, ptime=10ms, higher bitrate)
+                offer.sdp = applyOpusSettings(offer.sdp, 256000);
+
+                await peerConnection.setLocalDescription(offer);
+                
+                // Try to set sender bitrate
+                await setSenderBitrate(peerConnection, 'audio', 256000);
+
                 sendMessage({
                     type: 'webrtc-offer',
                     data: {
@@ -733,28 +826,55 @@
                         offer: offer
                     }
                 });
+            }).catch(e => {
+                console.error('createOffer failed:', e);
             });
         }
 
-        // Handle WebRTC offer
+        // Handle WebRTC offer (listener side)
         function handleWebRTCOffer(data) {
             const peerConnection = new RTCPeerConnection({
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' }
-                ]
+                ],
+                bundlePolicy: 'max-bundle',
+                rtcpMuxPolicy: 'require'
             });
             
             peerConnections[data.fromUserId] = peerConnection;
             
-            // Handle incoming stream
+            // Handle incoming stream (low-latency)
             peerConnection.ontrack = (event) => {
+                const remoteStream = event.streams[0];
                 const remoteAudio = document.getElementById('remoteAudio');
-                remoteAudio.srcObject = event.streams[0];
-                 // Try to reduce buffering to ~20ms
-                 const receiver = peerConnection.getReceivers().find(r => r.track.kind === 'audio');
-                if (receiver && receiver.playoutDelayHint !== undefined) {
-                     receiver.playoutDelayHint = 0.02; // 20 ms
-            }   
+
+                // Fallback assignment for compatibility
+                try {
+                    remoteAudio.srcObject = remoteStream;
+                    remoteAudio.autoplay = true;
+                    remoteAudio.playsInline = true;
+
+                    // Use WebAudio for low-latency playout
+                    if (!window._remoteAudioCtx || window._remoteAudioCtx.state === 'closed') {
+                        window._remoteAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+                    }
+                    const ctx = window._remoteAudioCtx;
+                    const src = ctx.createMediaStreamSource(remoteStream);
+                    src.connect(ctx.destination);
+                    if (ctx.state === 'suspended') {
+                        ctx.resume().catch(e => console.warn('AudioContext resume failed', e));
+                    }
+
+                    // Hint playout delay
+                    const receiver = peerConnection.getReceivers().find(r => r.track && r.track.kind === 'audio');
+                    if (receiver && receiver.playoutDelayHint !== undefined) {
+                        try { receiver.playoutDelayHint = 0.02; } catch(e) { /* ignore */ }
+                    }
+                } catch (e) {
+                    // fallback
+                    remoteAudio.srcObject = remoteStream;
+                    console.warn('WebAudio fallback used', e);
+                }
 
                 document.getElementById('audioStatus').textContent = 'Receiving audio from host...';
             };
@@ -776,8 +896,10 @@
             // Set remote description and create answer
             peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer)).then(() => {
                 return peerConnection.createAnswer();
-            }).then(answer => {
-                peerConnection.setLocalDescription(answer);
+            }).then(async answer => {
+                // Apply opus settings to answer as well
+                answer.sdp = applyOpusSettings(answer.sdp, 256000);
+                await peerConnection.setLocalDescription(answer);
                 sendMessage({
                     type: 'webrtc-answer',
                     data: {
@@ -786,6 +908,8 @@
                         answer: answer
                     }
                 });
+            }).catch(err => {
+                console.error('handleWebRTCOffer error:', err);
             });
         }
 
