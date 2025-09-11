@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LYSN — Stream Together</title>
+  <title>LYSN — Stream Together </title>
 
   <style>
     :root{
@@ -29,6 +29,7 @@
     .user-item{padding:8px;border-radius:8px;background:#fbfcfd;border:1px solid #eef2f7}
     #remoteAudio{width:100%;margin-top:12px}
     #enableAudioBtn{position:fixed;right:18px;bottom:18px;padding:10px 14px;border-radius:10px;background:#0b0a13;color:#fff;border:none}
+    .sync-info{margin-top:10px;font-size:12px;color:var(--muted);font-family:monospace}
     @media (max-width:900px){ .grid{grid-template-columns:1fr} }
   </style>
 </head>
@@ -37,8 +38,8 @@
     <div class="hero">
       <div class="logo">LY</div>
       <div>
-        <h1>LYSN — Stream Together</h1>
-        <div style="color:var(--muted)">Share system audio with friends, in sync 🎵</div>
+        <h1>LYSN — Stream Together (Improved Sync)</h1>
+        <div style="color:var(--muted)">Share system audio with friends, in perfect sync 🎵</div>
       </div>
     </div>
 
@@ -73,6 +74,12 @@
       </div>
 
       <audio id="remoteAudio" autoplay playsinline controls></audio>
+      
+      <div class="sync-info">
+        <div id="syncStatus">Sync: Not active</div>
+        <div id="latencyInfo">Latency: Measuring...</div>
+        <div id="bufferInfo">Buffer: 0ms</div>
+      </div>
 
       <div style="margin-top:14px">
         <strong>Listeners (<span id="userCount">0</span>)</strong>
@@ -85,7 +92,7 @@
   // ---------- Config ----------
   const WS_URL = window.location.hostname === "localhost"
     ? "ws://localhost:3000"
-    : "wss://lysn-backend.onrender.com"; // 🔴 Replace with your Render URL
+    : "wss://lysn-backend.onrender.com";
   const ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' }
@@ -93,30 +100,118 @@
 
   let socket, myUserId, currentRoom, isHost = false;
   let users = {}, peerConnections = {}, localStream = null, enableAudioButton = null;
+  
+  // NEW: Sync-related variables
+  let audioContext = null;
+  let audioBuffer = null;
+  let scheduledStartTime = 0;
+  let latencyOffset = 0;
+  let syncInterval = null;
+  let lastSyncTime = 0;
+  const BUFFER_SIZE = 100; // 100ms buffer
+  const SYNC_INTERVAL = 5000; // Sync every 5 seconds
 
   const el = id => document.getElementById(id);
   const remoteAudio = el('remoteAudio');
 
   function connectWS() {
     socket = new WebSocket(WS_URL);
-    socket.onopen = () => console.log("Connected to signaling server");
+    socket.onopen = () => {
+      console.log("Connected to signaling server");
+      startLatencyMeasurement();
+    };
     socket.onmessage = e => { const msg = JSON.parse(e.data); handleMessage(msg); };
     socket.onclose = () => setTimeout(connectWS, 2000);
   }
   connectWS();
   function sendMessage(obj){ socket.send(JSON.stringify(obj)); }
 
+  // NEW: Initialize AudioContext for precise timing
+  async function initAudioContext() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+    }
+    return audioContext;
+  }
+
+  // NEW: Measure network latency
+  function startLatencyMeasurement() {
+    const measureLatency = () => {
+      const startTime = performance.now();
+      sendMessage({ 
+        type: "ping", 
+        data: { timestamp: startTime, userId: myUserId } 
+      });
+    };
+    
+    measureLatency();
+    setInterval(measureLatency, SYNC_INTERVAL);
+  }
+
+  // NEW: Handle pong response and calculate latency
+  function handlePong(data) {
+    const now = performance.now();
+    const roundTripTime = now - data.timestamp;
+    latencyOffset = Math.round(roundTripTime / 2);
+    
+    el("latencyInfo").textContent = `Latency: ${latencyOffset}ms`;
+    console.log(`Network latency: ${latencyOffset}ms`);
+  }
+
+  // NEW: Synchronize audio playback timing
+  function synchronizePlayback(serverStartTime) {
+    if (!audioContext || isHost) return;
+    
+    const now = performance.now();
+    const adjustedServerTime = serverStartTime + latencyOffset;
+    const timeDiff = adjustedServerTime - now;
+    
+    console.log(`Sync: Server start in ${timeDiff}ms, latency offset: ${latencyOffset}ms`);
+    
+    if (timeDiff > 0) {
+      // Schedule playback for the future
+      setTimeout(() => {
+        if (remoteAudio.paused) {
+          remoteAudio.play().catch(showEnableBtn);
+        }
+        el("syncStatus").textContent = `Sync: Active (±${Math.abs(timeDiff)}ms)`;
+      }, timeDiff + BUFFER_SIZE);
+    } else {
+      // Immediate playback with seek adjustment
+      const seekOffset = Math.abs(timeDiff) / 1000;
+      if (remoteAudio.currentTime < seekOffset) {
+        remoteAudio.currentTime = seekOffset;
+      }
+      if (remoteAudio.paused) {
+        remoteAudio.play().catch(showEnableBtn);
+      }
+      el("syncStatus").textContent = `Sync: Active (±${Math.abs(timeDiff)}ms)`;
+    }
+    
+    el("bufferInfo").textContent = `Buffer: ${BUFFER_SIZE}ms`;
+  }
+
   // Room actions
   el("btnCreate").onclick = () => {
     const username = el("createName").value.trim() || "Host";
     sendMessage({ type:"create-room", data:{ username } });
   };
-  el("btnJoin").onclick = () => {
+  el("btnJoin").onclick = async () => {
     const username = el("joinName").value.trim();
     const roomCode = el("joinCode").value.trim();
-    if(username && roomCode) sendMessage({ type:"join-room", data:{ username, roomCode } });
+    if(username && roomCode) {
+      await initAudioContext(); // Initialize audio context for listeners
+      sendMessage({ type:"join-room", data:{ username, roomCode } });
+    }
   };
-  el("btnLeave").onclick = () => { sendMessage({ type:"leave-room", data:{ roomCode:currentRoom } }); location.reload(); };
+  el("btnLeave").onclick = () => { 
+    if (syncInterval) clearInterval(syncInterval);
+    sendMessage({ type:"leave-room", data:{ roomCode:currentRoom } }); 
+    location.reload(); 
+  };
   el("btnStart").onclick = startAudioShare;
   el("btnStop").onclick = stopAudioShare;
 
@@ -129,6 +224,7 @@
         el("roleInfo").textContent = "Role: Host";
         el("roomPanel").classList.remove("hidden");
         el("createInfo").textContent = `Share code: ${currentRoom}`;
+        await initAudioContext(); // Initialize for host too
         break;
       case "room-joined":
         myUserId = msg.data.userId; currentRoom = msg.data.roomCode; isHost = false;
@@ -147,8 +243,29 @@
       case "webrtc-offer": await handleOffer(msg.data); break;
       case "webrtc-answer": await handleAnswer(msg.data); break;
       case "webrtc-ice-candidate": await handleCandidate(msg.data); break;
-      case "audio-started": if(!isHost) el("roleInfo").textContent="Host started sharing"; break;
-      case "audio-stopped": if(!isHost){ remoteAudio.srcObject=null; el("roleInfo").textContent="Host stopped sharing"; } break;
+      case "audio-started": 
+        if(!isHost) {
+          el("roleInfo").textContent="Host started sharing";
+          // NEW: Handle synchronized start
+          if (msg.data.startTime) {
+            synchronizePlayback(msg.data.startTime);
+          }
+        } 
+        break;
+      case "audio-stopped": 
+        if(!isHost){ 
+          remoteAudio.srcObject=null; 
+          el("roleInfo").textContent="Host stopped sharing";
+          el("syncStatus").textContent = "Sync: Not active";
+        } 
+        break;
+      // NEW: Handle ping/pong for latency measurement
+      case "pong": handlePong(msg.data); break;
+      case "sync-update": 
+        if (!isHost && msg.data.startTime) {
+          synchronizePlayback(msg.data.startTime);
+        }
+        break;
     }
   }
 
@@ -162,19 +279,54 @@
     el("userCount").textContent=Object.keys(users).length;
   }
 
-  // WebRTC setup
+  // WebRTC setup with improved configuration
   function createPeerConnection(userId){
-    const pc = new RTCPeerConnection({iceServers:ICE_SERVERS});
-    pc.onicecandidate = e=>{ if(e.candidate) sendMessage({type:"webrtc-ice-candidate",data:{roomCode:currentRoom,targetUserId:userId,candidate:e.candidate}}); };
-    pc.ontrack = e=>{ if(!isHost){ remoteAudio.srcObject = e.streams[0]; remoteAudio.play().catch(showEnableBtn); } };
-    peerConnections[userId]=pc; return pc;
+    const pc = new RTCPeerConnection({
+      iceServers: ICE_SERVERS,
+      // NEW: Optimized for low latency
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require'
+    });
+    
+    pc.onicecandidate = e=>{ 
+      if(e.candidate) sendMessage({
+        type:"webrtc-ice-candidate",
+        data:{roomCode:currentRoom,targetUserId:userId,candidate:e.candidate}
+      }); 
+    };
+    
+    pc.ontrack = e=>{ 
+      if(!isHost){ 
+        // NEW: Set up audio with minimal buffering
+        remoteAudio.srcObject = e.streams[0]; 
+        remoteAudio.muted = false;
+        
+        // Reduce buffering for lower latency
+        if (remoteAudio.buffered && remoteAudio.buffered.length > 0) {
+          remoteAudio.currentTime = remoteAudio.buffered.end(remoteAudio.buffered.length - 1);
+        }
+        
+        remoteAudio.play().catch(showEnableBtn);
+      } 
+    };
+    
+    peerConnections[userId]=pc; 
+    return pc;
   }
 
   async function initiateWebRTC(userId){
     const pc = createPeerConnection(userId);
     if(localStream){
       localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
-      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+      
+      // NEW: Optimize offer for low latency
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false,
+        voiceActivityDetection: false
+      }); 
+      await pc.setLocalDescription(offer);
       sendMessage({type:"webrtc-offer",data:{roomCode:currentRoom,targetUserId:userId,offer}});
     }
   }
@@ -182,41 +334,106 @@
   async function handleOffer(data){
     const pc = createPeerConnection(data.fromUserId);
     await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-    const answer = await pc.createAnswer(); await pc.setLocalDescription(answer);
+    
+    // NEW: Optimize answer for low latency
+    const answer = await pc.createAnswer({
+      offerToReceiveAudio: true,
+      offerToReceiveVideo: false,
+      voiceActivityDetection: false
+    }); 
+    await pc.setLocalDescription(answer);
     sendMessage({type:"webrtc-answer",data:{roomCode:currentRoom,targetUserId:data.fromUserId,answer}});
   }
+  
   async function handleAnswer(data){
-    const pc = peerConnections[data.fromUserId]; if(pc) await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+    const pc = peerConnections[data.fromUserId]; 
+    if(pc) await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
   }
+  
   async function handleCandidate(data){
-    const pc = peerConnections[data.fromUserId]; if(pc) await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    const pc = peerConnections[data.fromUserId]; 
+    if(pc) await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
   }
 
   async function startAudioShare(){
     try{
-      localStream = await navigator.mediaDevices.getDisplayMedia({audio:true,video:true});
+      // NEW: Request audio with optimal settings for low latency
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          sampleRate: 48000,
+          sampleSize: 16,
+          channelCount: 2
+        },
+        video: true
+      });
+      
       localStream.getVideoTracks().forEach(t=>t.stop()); // discard video
-      // keepalive
-      const a=document.createElement("audio");a.muted=true;a.srcObject=localStream;a.play().catch(()=>{});document.body.appendChild(a);
-      Object.keys(peerConnections).forEach(uid=>{ localStream.getTracks().forEach(t=>peerConnections[uid].addTrack(t,localStream)); });
-      sendMessage({type:"audio-started",data:{roomCode:currentRoom}});
-      el("btnStart").classList.add("hidden"); el("btnStop").classList.remove("hidden");
-    }catch(e){ alert("Error starting share: "+e.message); }
+      
+      // Create keepalive with minimal buffering
+      const a=document.createElement("audio");
+      a.muted=true;
+      a.srcObject=localStream;
+      a.play().catch(()=>{});
+      document.body.appendChild(a);
+      
+      // Add tracks to existing connections
+      Object.keys(peerConnections).forEach(uid=>{ 
+        localStream.getTracks().forEach(t=>peerConnections[uid].addTrack(t,localStream)); 
+      });
+      
+      // NEW: Send synchronized start time
+      const startTime = performance.now() + 200; // 200ms delay for coordination
+      sendMessage({
+        type:"audio-started",
+        data:{roomCode:currentRoom, startTime: startTime}
+      });
+      
+      el("btnStart").classList.add("hidden"); 
+      el("btnStop").classList.remove("hidden");
+      el("syncStatus").textContent = "Sync: Broadcasting";
+      
+      // NEW: Regular sync updates
+      syncInterval = setInterval(() => {
+        sendMessage({
+          type:"sync-update",
+          data:{roomCode:currentRoom, startTime: performance.now()}
+        });
+      }, SYNC_INTERVAL);
+      
+    }catch(e){ 
+      alert("Error starting share: "+e.message); 
+    }
   }
+  
   function stopAudioShare(){
-    localStream.getTracks().forEach(t=>t.stop()); localStream=null;
+    if (syncInterval) {
+      clearInterval(syncInterval);
+      syncInterval = null;
+    }
+    
+    localStream.getTracks().forEach(t=>t.stop()); 
+    localStream=null;
     sendMessage({type:"audio-stopped",data:{roomCode:currentRoom}});
-    el("btnStart").classList.remove("hidden"); el("btnStop").classList.add("hidden");
+    el("btnStart").classList.remove("hidden"); 
+    el("btnStop").classList.add("hidden");
+    el("syncStatus").textContent = "Sync: Not active";
   }
 
   function showEnableBtn(){
     if(enableAudioButton) return;
     enableAudioButton=document.createElement("button");
-    enableAudioButton.id="enableAudioBtn"; enableAudioButton.textContent="Enable Audio";
-    enableAudioButton.onclick=()=>{ remoteAudio.play(); enableAudioButton.remove(); enableAudioButton=null; };
+    enableAudioButton.id="enableAudioBtn"; 
+    enableAudioButton.textContent="Enable Audio";
+    enableAudioButton.onclick=()=>{ 
+      remoteAudio.play(); 
+      enableAudioButton.remove(); 
+      enableAudioButton=null; 
+    };
     document.body.appendChild(enableAudioButton);
   }
   </script>
 </body>
 </html>
-
