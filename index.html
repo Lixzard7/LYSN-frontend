@@ -109,7 +109,7 @@
   let syncInterval = null;
   let lastSyncTime = 0;
   const BUFFER_SIZE = 25; // 100ms buffer
-  const SYNC_INTERVAL = 5000; // Sync every 5 seconds
+  const SYNC_INTERVAL = 1000; // Sync every 5 seconds
 
   const el = id => document.getElementById(id);
   const remoteAudio = el('remoteAudio');
@@ -437,5 +437,6 @@
   </script>
 </body>
 </html>
+
 
 
