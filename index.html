@@ -125,6 +125,17 @@
   }
   connectWS();
   function sendMessage(obj){ socket.send(JSON.stringify(obj)); }
+    
+    // NEW: Initialize AudioContext for precise timing
+  async function initAudioContext() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+    }
+    return audioContext;
+  }
 
   // NEW: Initialize AudioContext for precise timing
   async function initAudioContext() {
@@ -159,6 +170,43 @@
     
     el("latencyInfo").textContent = `Latency: ${latencyOffset}ms`;
     console.log(`Network latency: ${latencyOffset}ms`);
+  }
+    // NEW: Synchronize audio playback timing
+  function synchronizePlayback(serverStartTime) {
+    if (!audioContext || isHost) return;
+    
+    const now = performance.now();
+    const adjustedServerTime = serverStartTime + latencyOffset;
+    let timeDiff = adjustedServerTime - now;
+    
+    console.log(`Sync: Server start in ${timeDiff}ms, latency offset: ${latencyOffset}ms`);
+    
+    if (timeDiff > 10) {
+      // Schedule playback for the future with minimal buffer
+      setTimeout(() => {
+        if (remoteAudio.paused) {
+          remoteAudio.currentTime = 0;
+          remoteAudio.play().catch(showEnableBtn);
+        }
+      }, timeDiff + BUFFER_SIZE);
+    } else if (timeDiff < -10) {
+      // We're behind - seek forward to catch up
+      const seekOffset = Math.abs(timeDiff) / 1000;
+      try {
+        remoteAudio.currentTime += seekOffset;
+        if (remoteAudio.paused) {
+          remoteAudio.play().catch(showEnableBtn);
+        }
+      } catch(e) {
+        remoteAudio.currentTime = seekOffset;
+        remoteAudio.play().catch(showEnableBtn);
+      }
+    } else {
+      // Close enough - immediate playback
+      if (remoteAudio.paused) {
+        remoteAudio.play().catch(showEnableBtn);
+      }
+    }
   }
 
   // NEW: Synchronize audio playback timing
@@ -365,7 +413,8 @@
           autoGainControl: false,
           sampleRate: 48000,
           sampleSize: 16,
-          channelCount: 2
+          channelCount: 2,
+          latency: 0.025 
         },
         video: true
       });
@@ -385,11 +434,17 @@
       });
       
       // NEW: Send synchronized start time
-      const startTime = performance.now() + 200; // 200ms delay for coordination
+      const startTime = performance.now() + 50; // 200ms delay for coordination
       sendMessage({
         type:"audio-started",
         data:{roomCode:currentRoom, startTime: startTime}
       });
+      syncInterval = setInterval(() => {
+        sendMessage({
+          type:"sync-update",
+          data:{roomCode:currentRoom, startTime: performance.now()}
+        });
+      }, SYNC_INTERVAL);
       
       el("btnStart").classList.add("hidden"); 
       el("btnStop").classList.remove("hidden");
@@ -437,6 +492,7 @@
   </script>
 </body>
 </html>
+
 
 
 
