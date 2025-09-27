@@ -3,60 +3,232 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LYSN — Stream Together </title>
+  <title>LYSN – Stream Together</title>
+  
+  <!-- OGL Library for WebGL -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ogl/0.0.98/ogl.umd.js"></script>
 
   <style>
     :root{
-      --bg:#f6f8fb; --card:#fff; --muted:#6b7280; --accent:#0b0a13;
+      --bg:#f6f8fb; --card:rgba(255, 255, 255, 0.15); --muted:#a0a0a0; --accent:#ffffff;
       --success:#16a34a; --danger:#ef4444;
     }
     *{box-sizing:border-box;font-family:Inter, system-ui, sans-serif}
-    body{margin:0;background:linear-gradient(180deg,#fff,#f1f5f9);color:#111}
-    .wrap{max-width:1100px;margin:28px auto;padding:20px}
+    body{
+      margin:0;
+      background: radial-gradient(ellipse at top left, #00ff87 0%, #60efff 25%, #0099ff 50%, #8b5cf6 75%, #1e1b4b 100%);
+      color:#fff;
+      overflow-x:hidden;
+      min-height:100vh;
+      position: relative;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(0, 255, 135, 0.3) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.4) 0%, transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(96, 239, 255, 0.2) 0%, transparent 50%),
+        linear-gradient(135deg, rgba(0, 255, 135, 0.1) 0%, rgba(30, 27, 75, 0.8) 100%);
+      z-index: -1;
+      animation: aurora-flow 8s ease-in-out infinite alternate;
+    }
+    
+    @keyframes aurora-flow {
+      0% {
+        transform: translateY(0px) scale(1);
+        opacity: 0.8;
+      }
+      50% {
+        transform: translateY(-10px) scale(1.02);
+        opacity: 1;
+      }
+      100% {
+        transform: translateY(5px) scale(0.98);
+        opacity: 0.9;
+      }
+    }
+    
+    /* Aurora Background */
+    .aurora-container {
+      display: none;
+    }
+    
+    .wrap{max-width:1100px;margin:28px auto;padding:20px;position:relative;z-index:1;}
     .hero{display:flex;align-items:center;gap:16px}
-    .logo{width:56px;height:56px;border-radius:12px;background:#0b0a13;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
-    h1{font-size:22px;margin:0}
+    .logo{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,0.2);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);}
+    h1{font-size:22px;margin:0;text-shadow:0 2px 20px rgba(0,0,0,0.5);font-weight:700;}
+    
+    /* GlitchText Animation Styles */
+    .glitch {
+      color: #fff;
+      font-size: clamp(1.2rem, 4vw, 1.5rem);
+      white-space: nowrap;
+      font-weight: 900;
+      position: relative;
+      margin: 0;
+      user-select: none;
+      cursor: pointer;
+      --after-duration: 3s;
+      --before-duration: 2s;
+      --after-shadow: -3px 0 #ff0080;
+      --before-shadow: 3px 0 #00ffff;
+    }
+    
+    .glitch::after,
+    .glitch::before {
+      content: attr(data-text);
+      position: absolute;
+      top: 0;
+      color: #fff;
+      background-color: rgba(6, 0, 16, 0.8);
+      overflow: hidden;
+      clip-path: inset(0 0 0 0);
+    }
+    
+    .glitch:not(.enable-on-hover)::after {
+      left: 3px;
+      text-shadow: var(--after-shadow);
+      animation: animate-glitch var(--after-duration) infinite linear alternate-reverse;
+    }
+    
+    .glitch:not(.enable-on-hover)::before {
+      left: -3px;
+      text-shadow: var(--before-shadow);
+      animation: animate-glitch var(--before-duration) infinite linear alternate-reverse;
+    }
+    
+    .glitch.enable-on-hover::after,
+    .glitch.enable-on-hover::before {
+      content: '';
+      opacity: 0;
+      animation: none;
+    }
+    
+    .glitch.enable-on-hover:hover::after {
+      content: attr(data-text);
+      opacity: 1;
+      left: 3px;
+      text-shadow: var(--after-shadow);
+      animation: animate-glitch var(--after-duration) infinite linear alternate-reverse;
+    }
+    
+    .glitch.enable-on-hover:hover::before {
+      content: attr(data-text);
+      opacity: 1;
+      left: -3px;
+      text-shadow: var(--before-shadow);
+      animation: animate-glitch var(--before-duration) infinite linear alternate-reverse;
+    }
+    
+    @keyframes animate-glitch {
+      0% { clip-path: inset(20% 0 50% 0); }
+      5% { clip-path: inset(10% 0 60% 0); }
+      10% { clip-path: inset(15% 0 55% 0); }
+      15% { clip-path: inset(25% 0 35% 0); }
+      20% { clip-path: inset(30% 0 40% 0); }
+      25% { clip-path: inset(40% 0 20% 0); }
+      30% { clip-path: inset(10% 0 60% 0); }
+      35% { clip-path: inset(15% 0 55% 0); }
+      40% { clip-path: inset(25% 0 35% 0); }
+      45% { clip-path: inset(30% 0 40% 0); }
+      50% { clip-path: inset(20% 0 50% 0); }
+      55% { clip-path: inset(10% 0 60% 0); }
+      60% { clip-path: inset(15% 0 55% 0); }
+      65% { clip-path: inset(25% 0 35% 0); }
+      70% { clip-path: inset(30% 0 40% 0); }
+      75% { clip-path: inset(40% 0 20% 0); }
+      80% { clip-path: inset(20% 0 50% 0); }
+      85% { clip-path: inset(10% 0 60% 0); }
+      90% { clip-path: inset(15% 0 55% 0); }
+      95% { clip-path: inset(25% 0 35% 0); }
+      100% { clip-path: inset(30% 0 40% 0); }
+    }
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
-    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 8px 20px rgba(11,10,19,0.04)}
-    .btn{padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:600}
-    .btn.primary{background:var(--accent);color:#fff}
-    .btn.success{background:var(--success);color:#fff}
-    .btn.danger{background:var(--danger);color:#fff}
+    .card{background:var(--card);border-radius:16px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.3);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);}
+    .btn{padding:12px 16px;border-radius:12px;border:none;cursor:pointer;font-weight:600;transition:all 0.3s ease;font-size:14px;}
+    .btn.primary{background:rgba(255,255,255,0.9);color:#1e1b4b;font-weight:700;}
+    .btn.primary:hover{background:rgba(255,255,255,1);transform:translateY(-2px);box-shadow:0 8px 25px rgba(255,255,255,0.3);}
+    .btn.success{background:rgba(22,163,74,0.9);color:#fff;border:1px solid rgba(255,255,255,0.2);}
+    .btn.success:hover{background:rgba(22,163,74,1);transform:translateY(-2px);box-shadow:0 8px 25px rgba(22,163,74,0.4);}
+    .btn.danger{background:rgba(239,68,68,0.9);color:#fff;border:1px solid rgba(255,255,255,0.2);}
+    .btn.danger:hover{background:rgba(239,68,68,1);transform:translateY(-2px);box-shadow:0 8px 25px rgba(239,68,68,0.4);}
+    .btn:hover{box-shadow:0 4px 20px rgba(0,0,0,0.2);}
     .hidden{display:none}
-    input[type=text]{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef}
+    input[type=text]{width:100%;padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;backdrop-filter:blur(10px);font-size:14px;}
+    input[type=text]::placeholder{color:rgba(255,255,255,0.7);}
+    input[type=text]:focus{outline:none;border-color:rgba(255,255,255,0.4);box-shadow:0 0 0 3px rgba(255,255,255,0.1);background:rgba(255,255,255,0.15);}
     #roomPanel{margin-top:20px}
     #usersList{margin-top:12px;display:flex;flex-direction:column;gap:8px}
-    .user-item{padding:8px;border-radius:8px;background:#fbfcfd;border:1px solid #eef2f7}
-    #remoteAudio{width:100%;margin-top:12px}
-    #enableAudioBtn{position:fixed;right:18px;bottom:18px;padding:10px 14px;border-radius:10px;background:#0b0a13;color:#fff;border:none}
-    .sync-info{margin-top:10px;font-size:12px;color:var(--muted);font-family:monospace}
+    .user-item{padding:12px;border-radius:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.1);color:#fff;backdrop-filter:blur(10px);}
+    #remoteAudio{width:100%;margin-top:12px;border-radius:8px;}
+    #enableAudioBtn{position:fixed;right:18px;bottom:18px;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,0.9);color:#1e1b4b;border:none;backdrop-filter:blur(10px);font-weight:600;}
+    .sync-info{margin-top:10px;font-size:12px;color:rgba(255,255,255,0.8);font-family:monospace;background:rgba(255,255,255,0.05);padding:8px;border-radius:8px;}
+    .hero div:last-child{color:rgba(255,255,255,0.9);text-shadow:0 2px 10px rgba(0,0,0,0.3);}
+    h3{color:#fff;margin:0 0 15px 0;font-weight:600;text-shadow:0 2px 10px rgba(0,0,0,0.3);}
+    
+    /* BlurText Animation Styles */
+    .blur-text-container {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    
+    .blur-text-word {
+      display: inline-block;
+      filter: blur(10px);
+      opacity: 0;
+      transform: translateY(-20px);
+      transition: all 0.35s ease-out;
+      will-change: transform, filter, opacity;
+    }
+    
+    .blur-text-word.animate {
+      filter: blur(0px);
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .blur-text-word:not(:last-child)::after {
+      content: '\00A0';
+    }
+    #createInfo, #joinInfo{color:rgba(255,255,255,0.8);font-weight:500;}
+    #roleInfo{color:rgba(255,255,255,0.8);}
+    strong{color:#fff;text-shadow:0 1px 5px rgba(0,0,0,0.3);}
     @media (max-width:900px){ .grid{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
+  <!-- Aurora Background Container (disabled) -->
+  <!-- <div id="auroraContainer" class="aurora-container"></div> -->
+
   <div class="wrap">
     <div class="hero">
       <div class="logo">LY</div>
       <div>
-        <h1>LYSN — Stream Together </h1>
-        <div style="color:var(--muted)">Share system audio with friends, in perfect sync 🎵</div>
+        <h1 class="glitch enable-on-hover" data-text="LYSN – Stream Together">LYSN – Stream Together</h1>
+        <div>Share system audio with friends, in perfect sync 🎵</div>
       </div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <h3>Create Room (Host)</h3>
+        <h3 class="blur-text-container" data-text="Create Room (Host)"></h3>
         <input id="createName" type="text" placeholder="Your name">
         <button id="btnCreate" class="btn primary" style="margin-top:12px">Create Room</button>
-        <div id="createInfo" style="margin-top:10px;color:var(--muted)"></div>
+        <div id="createInfo" style="margin-top:10px;"></div>
       </div>
 
       <div class="card">
-        <h3>Join Room (Listener)</h3>
+        <h3 class="blur-text-container" data-text="Join Room (Listener)"></h3>
         <input id="joinName" type="text" placeholder="Your name">
         <input id="joinCode" type="text" placeholder="Room code" style="margin-top:10px">
         <button id="btnJoin" class="btn primary" style="margin-top:12px">Join Room</button>
-        <div id="joinInfo" style="margin-top:10px;color:var(--muted)"></div>
+        <div id="joinInfo" style="margin-top:10px;"></div>
       </div>
     </div>
 
@@ -64,7 +236,7 @@
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
           <strong id="roomTitle">Room</strong>
-          <div id="roleInfo" style="color:var(--muted);font-size:13px">Not connected</div>
+          <div id="roleInfo" style="font-size:13px">Not connected</div>
         </div>
         <div style="display:flex;gap:8px">
           <button id="btnStart" class="btn success">Start Audio</button>
@@ -89,7 +261,311 @@
   </div>
 
   <script>
-  // ---------- Config ----------
+  // BlurText Animation Implementation
+  class BlurTextAnimator {
+    constructor() {
+      this.animatedElements = new Set();
+      this.init();
+    }
+
+    init() {
+      // Setup intersection observer for scroll-triggered animations
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !this.animatedElements.has(entry.target)) {
+              this.animateText(entry.target);
+              this.animatedElements.add(entry.target);
+            }
+          });
+        },
+        { threshold: 0.1, rootMargin: '0px' }
+      );
+
+      // Initialize all blur text elements
+      this.setupBlurTexts();
+    }
+
+    setupBlurTexts() {
+      const blurTextContainers = document.querySelectorAll('.blur-text-container');
+      
+      blurTextContainers.forEach(container => {
+        const text = container.dataset.text || container.textContent;
+        const words = text.split(' ');
+        
+        // Clear existing content
+        container.innerHTML = '';
+        
+        // Create word spans
+        words.forEach((word, index) => {
+          const span = document.createElement('span');
+          span.className = 'blur-text-word';
+          span.textContent = word;
+          span.style.transitionDelay = `${index * 150}ms`;
+          container.appendChild(span);
+        });
+
+        // Start observing for scroll animation
+        this.observer.observe(container);
+      });
+    }
+
+    animateText(container) {
+      const words = container.querySelectorAll('.blur-text-word');
+      
+      words.forEach((word, index) => {
+        setTimeout(() => {
+          word.classList.add('animate');
+        }, index * 150);
+      });
+
+      // Trigger completion callback after last word animates
+      const lastWordDelay = (words.length - 1) * 150 + 350; // 350ms is transition duration
+      setTimeout(() => {
+        console.log(`Animation completed for: ${container.dataset.text}`);
+      }, lastWordDelay);
+    }
+
+    // Method to trigger animation immediately (for elements already in view)
+    triggerImmediate(selector) {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (!this.animatedElements.has(el)) {
+          this.animateText(el);
+          this.animatedElements.add(el);
+        }
+      });
+    }
+  }
+
+  // Initialize BlurText animations when DOM is loaded
+  let blurTextAnimator;
+  document.addEventListener('DOMContentLoaded', () => {
+    blurTextAnimator = new BlurTextAnimator();
+    
+    // Trigger animations immediately for elements in viewport
+    setTimeout(() => {
+      blurTextAnimator.triggerImmediate('.blur-text-container');
+    }, 500); // Small delay to ensure smooth loading
+  });
+
+  // Aurora Background Implementation
+  class AuroraBackground {
+    constructor(container) {
+      this.container = container;
+      this.colorStops = ['#5227FF', '#7cff67', '#5227FF'];
+      this.amplitude = 1.0;
+      this.blend = 0.5;
+      this.time = 0;
+      this.speed = 1.0;
+      this.init();
+    }
+
+    init() {
+      // Use OGL from the global scope
+      const { Renderer, Program, Mesh, Color, Triangle } = OGL;
+      
+      this.renderer = new Renderer({
+        alpha: true,
+        premultipliedAlpha: true,
+        antialias: true
+      });
+      
+      const gl = this.renderer.gl;
+      gl.clearColor(0, 0, 0, 0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.canvas.style.backgroundColor = 'transparent';
+
+      this.setupProgram(gl);
+      this.setupGeometry(gl);
+      this.container.appendChild(gl.canvas);
+      
+      this.resize();
+      this.animate();
+      
+      window.addEventListener('resize', () => this.resize());
+    }
+
+    setupProgram(gl) {
+      const { Program, Color } = OGL;
+      
+      const VERT = `#version 300 es
+      in vec2 position;
+      void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
+      }`;
+
+      const FRAG = `#version 300 es
+      precision highp float;
+
+      uniform float uTime;
+      uniform float uAmplitude;
+      uniform vec3 uColorStops[3];
+      uniform vec2 uResolution;
+      uniform float uBlend;
+
+      out vec4 fragColor;
+
+      vec3 permute(vec3 x) {
+        return mod(((x * 34.0) + 1.0) * x, 289.0);
+      }
+
+      float snoise(vec2 v){
+        const vec4 C = vec4(
+            0.211324865405187, 0.366025403784439,
+            -0.577350269189626, 0.024390243902439
+        );
+        vec2 i  = floor(v + dot(v, C.yy));
+        vec2 x0 = v - i + dot(i, C.xx);
+        vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+        vec4 x12 = x0.xyxy + C.xxzz;
+        x12.xy -= i1;
+        i = mod(i, 289.0);
+
+        vec3 p = permute(
+            permute(i.y + vec3(0.0, i1.y, 1.0))
+          + i.x + vec3(0.0, i1.x, 1.0)
+        );
+
+        vec3 m = max(
+            0.5 - vec3(
+                dot(x0, x0),
+                dot(x12.xy, x12.xy),
+                dot(x12.zw, x12.zw)
+            ), 
+            0.0
+        );
+        m = m * m;
+        m = m * m;
+
+        vec3 x = 2.0 * fract(p * C.www) - 1.0;
+        vec3 h = abs(x) - 0.5;
+        vec3 ox = floor(x + 0.5);
+        vec3 a0 = x - ox;
+        m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+
+        vec3 g;
+        g.x  = a0.x  * x0.x  + h.x  * x0.y;
+        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+        return 130.0 * dot(m, g);
+      }
+
+      struct ColorStop {
+        vec3 color;
+        float position;
+      };
+
+      #define COLOR_RAMP(colors, factor, finalColor) {              \\
+        int index = 0;                                            \\
+        for (int i = 0; i < 2; i++) {                               \\
+           ColorStop currentColor = colors[i];                    \\
+           bool isInBetween = currentColor.position <= factor;    \\
+           index = int(mix(float(index), float(i), float(isInBetween))); \\
+        }                                                         \\
+        ColorStop currentColor = colors[index];                   \\
+        ColorStop nextColor = colors[index + 1];                  \\
+        float range = nextColor.position - currentColor.position; \\
+        float lerpFactor = (factor - currentColor.position) / range; \\
+        finalColor = mix(currentColor.color, nextColor.color, lerpFactor); \\
+      }
+
+      void main() {
+        vec2 uv = gl_FragCoord.xy / uResolution;
+        
+        ColorStop colors[3];
+        colors[0] = ColorStop(uColorStops[0], 0.0);
+        colors[1] = ColorStop(uColorStops[1], 0.5);
+        colors[2] = ColorStop(uColorStops[2], 1.0);
+        
+        vec3 rampColor;
+        COLOR_RAMP(colors, uv.x, rampColor);
+        
+        float height = snoise(vec2(uv.x * 2.0 + uTime * 0.1, uTime * 0.25)) * 0.5 * uAmplitude;
+        height = exp(height);
+        height = (uv.y * 2.0 - height + 0.2);
+        float intensity = 0.6 * height;
+        
+        float midPoint = 0.20;
+        float auroraAlpha = smoothstep(midPoint - uBlend * 0.5, midPoint + uBlend * 0.5, intensity);
+        
+        vec3 auroraColor = intensity * rampColor;
+        
+        fragColor = vec4(auroraColor * auroraAlpha, auroraAlpha);
+      }`;
+
+      const colorStopsArray = this.colorStops.map(hex => {
+        const c = new Color(hex);
+        return [c.r, c.g, c.b];
+      });
+
+      this.program = new Program(gl, {
+        vertex: VERT,
+        fragment: FRAG,
+        uniforms: {
+          uTime: { value: 0 },
+          uAmplitude: { value: this.amplitude },
+          uColorStops: { value: colorStopsArray },
+          uResolution: { value: [this.container.offsetWidth, this.container.offsetHeight] },
+          uBlend: { value: this.blend }
+        }
+      });
+    }
+
+    setupGeometry(gl) {
+      const { Mesh, Triangle } = OGL;
+      
+      this.geometry = new Triangle(gl);
+      if (this.geometry.attributes.uv) {
+        delete this.geometry.attributes.uv;
+      }
+      
+      this.mesh = new Mesh(gl, { 
+        geometry: this.geometry, 
+        program: this.program 
+      });
+    }
+
+    resize() {
+      const width = this.container.offsetWidth;
+      const height = this.container.offsetHeight;
+      this.renderer.setSize(width, height);
+      this.program.uniforms.uResolution.value = [width, height];
+    }
+
+    animate() {
+      this.animateId = requestAnimationFrame(() => this.animate());
+      
+      this.time += 0.01;
+      this.program.uniforms.uTime.value = this.time * this.speed * 0.1;
+      this.program.uniforms.uAmplitude.value = this.amplitude;
+      this.program.uniforms.uBlend.value = this.blend;
+      
+      this.renderer.render({ scene: this.mesh });
+    }
+
+    destroy() {
+      if (this.animateId) {
+        cancelAnimationFrame(this.animateId);
+      }
+      const gl = this.renderer.gl;
+      if (gl.canvas.parentNode === this.container) {
+        this.container.removeChild(gl.canvas);
+      }
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+    }
+  }
+
+  // Initialize Aurora Background (disabled for CSS gradient version)
+  // let aurora;
+  // window.addEventListener('load', () => {
+  //   const container = document.getElementById('auroraContainer');
+  //   if (container && window.OGL) {
+  //     aurora = new AuroraBackground(container);
+  //   }
+  // });
+
+  // ---------- Original LYSN Code ----------
   const WS_URL = window.location.hostname === "localhost"
     ? "ws://localhost:3000"
     : "wss://lysn-backend.onrender.com";
@@ -101,15 +577,15 @@
   let socket, myUserId, currentRoom, isHost = false;
   let users = {}, peerConnections = {}, localStream = null, enableAudioButton = null;
   
-  // NEW: Sync-related variables
+  // Sync-related variables
   let audioContext = null;
   let audioBuffer = null;
   let scheduledStartTime = 0;
   let latencyOffset = 0;
   let syncInterval = null;
   let lastSyncTime = 0;
-  const BUFFER_SIZE = 25; // 100ms buffer
-  const SYNC_INTERVAL = 1000; // Sync every 5 seconds
+  const BUFFER_SIZE = 25;
+  const SYNC_INTERVAL = 1000;
 
   const el = id => document.getElementById(id);
   const remoteAudio = el('remoteAudio');
@@ -126,7 +602,6 @@
   connectWS();
   function sendMessage(obj){ socket.send(JSON.stringify(obj)); }
     
-    // NEW: Initialize AudioContext for precise timing
   async function initAudioContext() {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -137,18 +612,6 @@
     return audioContext;
   }
 
-  // NEW: Initialize AudioContext for precise timing
-  async function initAudioContext() {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
-      }
-    }
-    return audioContext;
-  }
-
-  // NEW: Measure network latency
   function startLatencyMeasurement() {
     const measureLatency = () => {
       const startTime = performance.now();
@@ -162,7 +625,6 @@
     setInterval(measureLatency, SYNC_INTERVAL);
   }
 
-  // NEW: Handle pong response and calculate latency
   function handlePong(data) {
     const now = performance.now();
     const roundTripTime = now - data.timestamp;
@@ -171,45 +633,7 @@
     el("latencyInfo").textContent = `Latency: ${latencyOffset}ms`;
     console.log(`Network latency: ${latencyOffset}ms`);
   }
-    // NEW: Synchronize audio playback timing
-  function synchronizePlayback(serverStartTime) {
-    if (!audioContext || isHost) return;
-    
-    const now = performance.now();
-    const adjustedServerTime = serverStartTime + latencyOffset;
-    let timeDiff = adjustedServerTime - now;
-    
-    console.log(`Sync: Server start in ${timeDiff}ms, latency offset: ${latencyOffset}ms`);
-    
-    if (timeDiff > 10) {
-      // Schedule playback for the future with minimal buffer
-      setTimeout(() => {
-        if (remoteAudio.paused) {
-          remoteAudio.currentTime = 0;
-          remoteAudio.play().catch(showEnableBtn);
-        }
-      }, timeDiff + BUFFER_SIZE);
-    } else if (timeDiff < -10) {
-      // We're behind - seek forward to catch up
-      const seekOffset = Math.abs(timeDiff) / 1000;
-      try {
-        remoteAudio.currentTime += seekOffset;
-        if (remoteAudio.paused) {
-          remoteAudio.play().catch(showEnableBtn);
-        }
-      } catch(e) {
-        remoteAudio.currentTime = seekOffset;
-        remoteAudio.play().catch(showEnableBtn);
-      }
-    } else {
-      // Close enough - immediate playback
-      if (remoteAudio.paused) {
-        remoteAudio.play().catch(showEnableBtn);
-      }
-    }
-  }
 
-  // NEW: Synchronize audio playback timing
   function synchronizePlayback(serverStartTime) {
     if (!audioContext || isHost) return;
     
@@ -220,7 +644,6 @@
     console.log(`Sync: Server start in ${timeDiff}ms, latency offset: ${latencyOffset}ms`);
     
     if (timeDiff > 0) {
-      // Schedule playback for the future
       setTimeout(() => {
         if (remoteAudio.paused) {
           remoteAudio.play().catch(showEnableBtn);
@@ -228,7 +651,6 @@
         el("syncStatus").textContent = `Sync: Active (±${Math.abs(timeDiff)}ms)`;
       }, timeDiff + BUFFER_SIZE);
     } else {
-      // Immediate playback with seek adjustment
       const seekOffset = Math.abs(timeDiff) / 1000;
       if (remoteAudio.currentTime < seekOffset) {
         remoteAudio.currentTime = seekOffset;
@@ -251,7 +673,7 @@
     const username = el("joinName").value.trim();
     const roomCode = el("joinCode").value.trim();
     if(username && roomCode) {
-      await initAudioContext(); // Initialize audio context for listeners
+      await initAudioContext();
       sendMessage({ type:"join-room", data:{ username, roomCode } });
     }
   };
@@ -272,7 +694,7 @@
         el("roleInfo").textContent = "Role: Host";
         el("roomPanel").classList.remove("hidden");
         el("createInfo").textContent = `Share code: ${currentRoom}`;
-        await initAudioContext(); // Initialize for host too
+        await initAudioContext();
         break;
       case "room-joined":
         myUserId = msg.data.userId; currentRoom = msg.data.roomCode; isHost = false;
@@ -294,7 +716,6 @@
       case "audio-started": 
         if(!isHost) {
           el("roleInfo").textContent="Host started sharing";
-          // NEW: Handle synchronized start
           if (msg.data.startTime) {
             synchronizePlayback(msg.data.startTime);
           }
@@ -307,7 +728,6 @@
           el("syncStatus").textContent = "Sync: Not active";
         } 
         break;
-      // NEW: Handle ping/pong for latency measurement
       case "pong": handlePong(msg.data); break;
       case "sync-update": 
         if (!isHost && msg.data.startTime) {
@@ -327,11 +747,9 @@
     el("userCount").textContent=Object.keys(users).length;
   }
 
-  // WebRTC setup with improved configuration
   function createPeerConnection(userId){
     const pc = new RTCPeerConnection({
       iceServers: ICE_SERVERS,
-      // NEW: Optimized for low latency
       iceTransportPolicy: 'all',
       bundlePolicy: 'max-bundle',
       rtcpMuxPolicy: 'require'
@@ -346,11 +764,9 @@
     
     pc.ontrack = e=>{ 
       if(!isHost){ 
-        // NEW: Set up audio with minimal buffering
         remoteAudio.srcObject = e.streams[0]; 
         remoteAudio.muted = false;
         
-        // Reduce buffering for lower latency
         if (remoteAudio.buffered && remoteAudio.buffered.length > 0) {
           remoteAudio.currentTime = remoteAudio.buffered.end(remoteAudio.buffered.length - 1);
         }
@@ -368,7 +784,6 @@
     if(localStream){
       localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
       
-      // NEW: Optimize offer for low latency
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: false,
@@ -383,7 +798,6 @@
     const pc = createPeerConnection(data.fromUserId);
     await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
     
-    // NEW: Optimize answer for low latency
     const answer = await pc.createAnswer({
       offerToReceiveAudio: true,
       offerToReceiveVideo: false,
@@ -405,7 +819,6 @@
 
   async function startAudioShare(){
     try{
-      // NEW: Request audio with optimal settings for low latency
       localStream = await navigator.mediaDevices.getDisplayMedia({
         audio: {
           echoCancellation: false,
@@ -419,22 +832,19 @@
         video: true
       });
       
-      localStream.getVideoTracks().forEach(t=>t.stop()); // discard video
+      localStream.getVideoTracks().forEach(t=>t.stop());
       
-      // Create keepalive with minimal buffering
       const a=document.createElement("audio");
       a.muted=true;
       a.srcObject=localStream;
       a.play().catch(()=>{});
       document.body.appendChild(a);
       
-      // Add tracks to existing connections
       Object.keys(peerConnections).forEach(uid=>{ 
         localStream.getTracks().forEach(t=>peerConnections[uid].addTrack(t,localStream)); 
       });
       
-      // NEW: Send synchronized start time
-      const startTime = performance.now() + 50; // 200ms delay for coordination
+      const startTime = performance.now() + 50;
       sendMessage({
         type:"audio-started",
         data:{roomCode:currentRoom, startTime: startTime}
@@ -449,14 +859,6 @@
       el("btnStart").classList.add("hidden"); 
       el("btnStop").classList.remove("hidden");
       el("syncStatus").textContent = "Sync: Broadcasting";
-      
-      // NEW: Regular sync updates
-      syncInterval = setInterval(() => {
-        sendMessage({
-          type:"sync-update",
-          data:{roomCode:currentRoom, startTime: performance.now()}
-        });
-      }, SYNC_INTERVAL);
       
     }catch(e){ 
       alert("Error starting share: "+e.message); 
@@ -492,7 +894,3 @@
   </script>
 </body>
 </html>
-
-
-
-
